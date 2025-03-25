@@ -75,6 +75,10 @@ func (t *TabList) RemoveTab(id uint64) {
 	}
 }
 
+func (t *TabList) showTabBar() bool {
+	return true //len(t.List) > 1
+}
+
 // Resize resizes all elements within the tab list
 // One thing to note is that when there is only 1 tab
 // the tab bar should not be drawn so resizing must take
@@ -83,13 +87,13 @@ func (t *TabList) Resize() {
 	w, h := screen.Screen.Size()
 	iOffset := config.GetInfoBarOffset()
 	InfoBar.Resize(w, h-1)
-	if len(t.List) > 1 {
+	if t.showTabBar() {
 		for _, p := range t.List {
 			p.Y = 1
 			p.Node.Resize(w, h-1-iOffset)
 			p.Resize()
 		}
-	} else if len(t.List) == 1 {
+	} else if !t.showTabBar() {
 		t.List[0].Y = 0
 		t.List[0].Node.Resize(w, h-iOffset)
 		t.List[0].Resize()
@@ -107,7 +111,7 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 		mx, my := e.Position()
 		switch e.Buttons() {
 		case tcell.Button1:
-			if my == t.Y && len(t.List) > 1 {
+			if my == t.Y && t.showTabBar() {
 				if mx == 0 {
 					t.Scroll(-4)
 				} else if mx == t.Width-1 {
@@ -127,12 +131,12 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 				return
 			}
 		case tcell.WheelUp:
-			if my == t.Y && len(t.List) > 1 {
+			if my == t.Y && t.showTabBar() {
 				t.Scroll(4)
 				return
 			}
 		case tcell.WheelDown:
-			if my == t.Y && len(t.List) > 1 {
+			if my == t.Y && t.showTabBar() {
 				t.Scroll(-4)
 				return
 			}
@@ -144,7 +148,7 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 // Display updates the names and then displays the tab bar
 func (t *TabList) Display() {
 	t.UpdateNames()
-	if len(t.List) > 1 {
+	if t.showTabBar() {
 		t.TabWindow.Display()
 	}
 }
@@ -211,7 +215,7 @@ func InitTabs(bufs []*buffer.Buffer) {
 		for _, b := range bufs[1:] {
 			if multiopen == "vsplit" {
 				MainTab().CurPane().VSplitBuf(b)
-			} else {  // default hsplit
+			} else { // default hsplit
 				MainTab().CurPane().HSplitBuf(b)
 			}
 		}
