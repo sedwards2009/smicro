@@ -11,6 +11,7 @@ import (
 	"time"
 
 	shellquote "github.com/kballard/go-shellquote"
+	"github.com/micro-editor/tcell/v2"
 	"github.com/zyedidia/micro/v2/internal/buffer"
 	"github.com/zyedidia/micro/v2/internal/clipboard"
 	"github.com/zyedidia/micro/v2/internal/config"
@@ -18,7 +19,6 @@ import (
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/shell"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 // ScrollUp is not an action
@@ -1973,7 +1973,7 @@ func (h *BufPane) AddTab() bool {
 	width, height := screen.Screen.Size()
 	iOffset := config.GetInfoBarOffset()
 	b := buffer.NewBufferFromString("", "", buffer.BTDefault)
-	tp := NewTabFromBuffer(0, 0, width, height-iOffset, b)
+	tp := NewTabFromBuffer(0, tabDisplayYOffset, width, height-iOffset, b)
 	Tabs.AddTab(tp)
 	Tabs.SetActive(len(Tabs.List) - 1)
 

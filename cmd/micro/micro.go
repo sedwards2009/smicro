@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-errors/errors"
 	isatty "github.com/mattn/go-isatty"
+	"github.com/micro-editor/tcell/v2"
 	lua "github.com/yuin/gopher-lua"
 	"github.com/zyedidia/micro/v2/internal/action"
 	"github.com/zyedidia/micro/v2/internal/buffer"
@@ -26,7 +27,6 @@ import (
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/shell"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 var (
@@ -469,6 +469,8 @@ func DoEvent() {
 	}
 	action.MainTab().Display()
 	action.InfoBar.Display()
+	action.TopMenuBar.Display()
+	action.PopUpDialog.Display()
 	screen.Screen.Show()
 
 	// Check for new events
@@ -512,10 +514,13 @@ func DoEvent() {
 		if resize {
 			action.InfoBar.HandleEvent(event)
 			action.Tabs.HandleEvent(event)
+		} else if action.PopUpDialog.IsOpen {
+			action.PopUpDialog.HandleEvent(event)
 		} else if action.InfoBar.HasPrompt {
 			action.InfoBar.HandleEvent(event)
 		} else {
 			action.Tabs.HandleEvent(event)
+			action.TopMenuBar.HandleEvent(event)
 		}
 	}
 
