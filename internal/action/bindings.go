@@ -12,10 +12,10 @@ import (
 	"unicode"
 
 	"github.com/micro-editor/json5"
+	"github.com/micro-editor/tcell/v2"
 	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 var Binder = map[string]func(e Event, action string){
@@ -54,50 +54,50 @@ func InitBindings() {
 		}
 	}
 
-	for p, bind := range Binder {
-		defaults := DefaultBindings(p)
+	for pane, bind := range Binder {
+		defaults := DefaultBindings(pane)
 
-		for k, v := range defaults {
-			BindKey(k, v, bind)
+		for keyName, actionName := range defaults {
+			BindKey(keyName, actionName, bind)
 		}
 	}
 
-	for k, v := range parsed {
+	for keyName, v := range parsed {
 		switch val := v.(type) {
 		case string:
-			BindKey(k, val, Binder["buffer"])
+			BindKey(keyName, val, Binder["buffer"])
 		case map[string]interface{}:
-			bind, ok := Binder[k]
+			bind, ok := Binder[keyName]
 			if !ok || bind == nil {
-				screen.TermMessage(fmt.Sprintf("%s is not a valid pane type", k))
+				screen.TermMessage(fmt.Sprintf("%s is not a valid pane type", keyName))
 				continue
 			}
-			for e, a := range val {
-				s, ok := a.(string)
+			for keyName2, a := range val {
+				actionName, ok := a.(string)
 				if !ok {
-					screen.TermMessage("Error reading bindings.json: non-string and non-map entry", k)
+					screen.TermMessage("Error reading bindings.json: non-string and non-map entry", keyName)
 				} else {
-					BindKey(e, s, bind)
+					BindKey(keyName2, actionName, bind)
 				}
 			}
 		default:
-			screen.TermMessage("Error reading bindings.json: non-string and non-map entry", k)
+			screen.TermMessage("Error reading bindings.json: non-string and non-map entry", keyName)
 		}
 	}
 }
 
-func BindKey(k, v string, bind func(e Event, a string)) {
-	event, err := findEvent(k)
+func BindKey(keyName string, actionName string, bind func(e Event, actionName string)) {
+	event, err := findEvent(keyName)
 	if err != nil {
 		screen.TermMessage(err)
 		return
 	}
 
-	if strings.HasPrefix(k, "\x1b") {
-		screen.RegisterRawSeq(k)
+	if strings.HasPrefix(keyName, "\x1b") {
+		screen.RegisterRawSeq(keyName)
 	}
 
-	bind(event, v)
+	bind(event, actionName)
 
 	// switch e := event.(type) {
 	// case KeyEvent:
@@ -113,24 +113,24 @@ func BindKey(k, v string, bind func(e Event, a string)) {
 
 var r = regexp.MustCompile("<(.+?)>")
 
-func findEvents(k string) (b KeySequenceEvent, ok bool, err error) {
+func findEvents(keyName string) (b KeySequenceEvent, ok bool, err error) {
 	var events []Event = nil
-	for len(k) > 0 {
-		groups := r.FindStringSubmatchIndex(k)
+	for len(keyName) > 0 {
+		groups := r.FindStringSubmatchIndex(keyName)
 
 		if len(groups) > 3 {
 			if events == nil {
 				events = make([]Event, 0, 3)
 			}
 
-			e, ok := findSingleEvent(k[groups[2]:groups[3]])
+			e, ok := findSingleEvent(keyName[groups[2]:groups[3]])
 			if !ok {
-				return KeySequenceEvent{}, false, errors.New("Invalid event " + k[groups[2]:groups[3]])
+				return KeySequenceEvent{}, false, errors.New("Invalid event " + keyName[groups[2]:groups[3]])
 			}
 
 			events = append(events, e)
 
-			k = k[groups[3]+1:]
+			keyName = keyName[groups[3]+1:]
 		} else {
 			return KeySequenceEvent{}, false, nil
 		}
@@ -140,7 +140,7 @@ func findEvents(k string) (b KeySequenceEvent, ok bool, err error) {
 }
 
 // findSingleEvent will find binding Key 'b' using string 'k'
-func findSingleEvent(k string) (b Event, ok bool) {
+func findSingleEvent(keyName string) (b Event, ok bool) {
 	modifiers := tcell.ModNone
 
 	// First, we'll strip off all the modifiers in the name and add them to the
@@ -148,29 +148,29 @@ func findSingleEvent(k string) (b Event, ok bool) {
 modSearch:
 	for {
 		switch {
-		case strings.HasPrefix(k, "-") && k != "-":
+		case strings.HasPrefix(keyName, "-") && keyName != "-":
 			// We optionally support dashes between modifiers
-			k = k[1:]
-		case strings.HasPrefix(k, "Ctrl") && k != "CtrlH":
+			keyName = keyName[1:]
+		case strings.HasPrefix(keyName, "Ctrl") && keyName != "CtrlH":
 			// CtrlH technically does not have a 'Ctrl' modifier because it is really backspace
-			k = k[4:]
+			keyName = keyName[4:]
 			modifiers |= tcell.ModCtrl
-		case strings.HasPrefix(k, "Alt"):
-			k = k[3:]
+		case strings.HasPrefix(keyName, "Alt"):
+			keyName = keyName[3:]
 			modifiers |= tcell.ModAlt
-		case strings.HasPrefix(k, "Shift"):
-			k = k[5:]
+		case strings.HasPrefix(keyName, "Shift"):
+			keyName = keyName[5:]
 			modifiers |= tcell.ModShift
-		case strings.HasPrefix(k, "\x1b"):
+		case strings.HasPrefix(keyName, "\x1b"):
 			return RawEvent{
-				esc: k,
+				esc: keyName,
 			}, true
 		default:
 			break modSearch
 		}
 	}
 
-	if k == "" {
+	if keyName == "" {
 		return KeyEvent{}, false
 	}
 
@@ -179,8 +179,8 @@ modSearch:
 	// We should check for Control keys first
 	if modifiers&tcell.ModCtrl != 0 {
 		// see if the key is in bindingKeys with the Ctrl prefix.
-		k = string(unicode.ToUpper(rune(k[0]))) + k[1:]
-		if code, ok := keyEvents["Ctrl"+k]; ok {
+		keyName = string(unicode.ToUpper(rune(keyName[0]))) + keyName[1:]
+		if code, ok := keyEvents["Ctrl"+keyName]; ok {
 			return KeyEvent{
 				code: code,
 				mod:  modifiers,
@@ -189,7 +189,7 @@ modSearch:
 	}
 
 	// See if we can find the key in bindingKeys
-	if code, ok := keyEvents[k]; ok {
+	if code, ok := keyEvents[keyName]; ok {
 		return KeyEvent{
 			code: code,
 			mod:  modifiers,
@@ -197,15 +197,15 @@ modSearch:
 	}
 
 	var mstate MouseState = MousePress
-	if strings.HasSuffix(k, "Drag") {
-		k = k[:len(k)-4]
+	if strings.HasSuffix(keyName, "Drag") {
+		keyName = keyName[:len(keyName)-4]
 		mstate = MouseDrag
-	} else if strings.HasSuffix(k, "Release") {
-		k = k[:len(k)-7]
+	} else if strings.HasSuffix(keyName, "Release") {
+		keyName = keyName[:len(keyName)-7]
 		mstate = MouseRelease
 	}
 	// See if we can find the key in bindingMouse
-	if code, ok := mouseEvents[k]; ok {
+	if code, ok := mouseEvents[keyName]; ok {
 		return MouseEvent{
 			btn:   code,
 			mod:   modifiers,
@@ -214,11 +214,11 @@ modSearch:
 	}
 
 	// If we were given one character, then we've got a rune.
-	if len(k) == 1 {
+	if len(keyName) == 1 {
 		return KeyEvent{
 			code: tcell.KeyRune,
 			mod:  modifiers,
-			r:    rune(k[0]),
+			r:    rune(keyName[0]),
 		}, true
 	}
 
@@ -226,17 +226,17 @@ modSearch:
 	return KeyEvent{}, false
 }
 
-func findEvent(k string) (Event, error) {
+func findEvent(keyName string) (Event, error) {
 	var event Event
-	event, ok, err := findEvents(k)
+	event, ok, err := findEvents(keyName)
 	if err != nil {
 		return nil, err
 	}
 
 	if !ok {
-		event, ok = findSingleEvent(k)
+		event, ok = findSingleEvent(keyName)
 		if !ok {
-			return nil, errors.New(k + " is not a bindable event")
+			return nil, errors.New(keyName + " is not a bindable event")
 		}
 	}
 
@@ -263,7 +263,7 @@ func eventsEqual(e1 Event, e2 Event) bool {
 
 // TryBindKey tries to bind a key by writing to config.ConfigDir/bindings.json
 // Returns true if the keybinding already existed and a possible error
-func TryBindKey(k, v string, overwrite bool) (bool, error) {
+func TryBindKey(keyName, actionName string, overwrite bool) (bool, error) {
 	var e error
 	var parsed map[string]interface{}
 
@@ -280,7 +280,7 @@ func TryBindKey(k, v string, overwrite bool) (bool, error) {
 			return false, errors.New("Error reading bindings.json: " + err.Error())
 		}
 
-		key, err := findEvent(k)
+		key, err := findEvent(keyName)
 		if err != nil {
 			return false, err
 		}
@@ -298,15 +298,15 @@ func TryBindKey(k, v string, overwrite bool) (bool, error) {
 
 		if found {
 			if overwrite {
-				parsed[ev] = v
+				parsed[ev] = actionName
 			} else {
 				return true, nil
 			}
 		} else {
-			parsed[k] = v
+			parsed[keyName] = actionName
 		}
 
-		BindKey(k, v, Binder["buffer"])
+		BindKey(keyName, actionName, Binder["buffer"])
 
 		txt, _ := json.MarshalIndent(parsed, "", "    ")
 		txt = append(txt, '\n')
@@ -316,7 +316,7 @@ func TryBindKey(k, v string, overwrite bool) (bool, error) {
 }
 
 // UnbindKey removes the binding for a key from the bindings.json file
-func UnbindKey(k string) error {
+func UnbindKey(keyName string) error {
 	var e error
 	var parsed map[string]interface{}
 
@@ -333,7 +333,7 @@ func UnbindKey(k string) error {
 			return errors.New("Error reading bindings.json: " + err.Error())
 		}
 
-		key, err := findEvent(k)
+		key, err := findEvent(keyName)
 		if err != nil {
 			return err
 		}
@@ -347,16 +347,16 @@ func UnbindKey(k string) error {
 			}
 		}
 
-		if strings.HasPrefix(k, "\x1b") {
-			screen.UnregisterRawSeq(k)
+		if strings.HasPrefix(keyName, "\x1b") {
+			screen.UnregisterRawSeq(keyName)
 		}
 
 		defaults := DefaultBindings("buffer")
-		if a, ok := defaults[k]; ok {
-			BindKey(k, a, Binder["buffer"])
-		} else if _, ok := config.Bindings["buffer"][k]; ok {
+		if a, ok := defaults[keyName]; ok {
+			BindKey(keyName, a, Binder["buffer"])
+		} else if _, ok := config.Bindings["buffer"][keyName]; ok {
 			BufUnmap(key)
-			delete(config.Bindings["buffer"], k)
+			delete(config.Bindings["buffer"], keyName)
 		}
 
 		txt, _ := json.MarshalIndent(parsed, "", "    ")

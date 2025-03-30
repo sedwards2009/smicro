@@ -6,6 +6,7 @@ import (
 
 	luar "layeh.com/gopher-luar"
 
+	"github.com/micro-editor/tcell/v2"
 	lua "github.com/yuin/gopher-lua"
 	"github.com/zyedidia/micro/v2/internal/buffer"
 	"github.com/zyedidia/micro/v2/internal/config"
@@ -13,7 +14,6 @@ import (
 	ulua "github.com/zyedidia/micro/v2/internal/lua"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 type BufAction interface{}
@@ -89,65 +89,76 @@ func LuaAction(fn string, k Event) BufAction {
 }
 
 // BufMapEvent maps an event to an action
-func BufMapEvent(k Event, action string) {
-	config.Bindings["buffer"][k.Name()] = action
+func BufMapEvent(k Event, actionName string) {
+	config.Bindings["buffer"][k.Name()] = actionName
 
 	var actionfns []BufAction
 	var names []string
-	var types []byte
-	for i := 0; ; i++ {
-		if action == "" {
-			break
-		}
-
-		idx := util.IndexAnyUnquoted(action, "&|,")
-		a := action
+	var types []byte // list of either '&', '|', ' '
+	for actionName != "" {
+		idx := util.IndexAnyUnquoted(actionName, "&|,")
+		a := actionName
 		if idx >= 0 {
-			a = action[:idx]
-			types = append(types, action[idx])
-			action = action[idx+1:]
+			a = actionName[:idx]
+			types = append(types, actionName[idx])
+			actionName = actionName[idx+1:]
 		} else {
 			types = append(types, ' ')
-			action = ""
+			actionName = ""
 		}
 
-		var afn BufAction
-		if strings.HasPrefix(a, "command:") {
-			a = strings.SplitN(a, ":", 2)[1]
-			afn = CommandAction(a)
-			names = append(names, "")
-		} else if strings.HasPrefix(a, "command-edit:") {
-			a = strings.SplitN(a, ":", 2)[1]
-			afn = CommandEditAction(a)
-			names = append(names, "")
-		} else if strings.HasPrefix(a, "lua:") {
-			a = strings.SplitN(a, ":", 2)[1]
-			afn = LuaAction(a, k)
-			if afn == nil {
-				screen.TermMessage("Lua Error:", a, "does not exist")
-				continue
-			}
-			split := strings.SplitN(a, ".", 2)
-			if len(split) > 1 {
-				a = strings.Title(split[0]) + strings.Title(split[1])
-			} else {
-				a = strings.Title(a)
-			}
-
-			names = append(names, a)
-		} else if f, ok := BufKeyActions[a]; ok {
-			afn = f
-			names = append(names, a)
-		} else if f, ok := BufMouseActions[a]; ok {
-			afn = f
-			names = append(names, a)
-		} else {
-			screen.TermMessage("Error in bindings: action", a, "does not exist")
-			continue
+		bufAction, name, ok := commandToAction(a, k)
+		if ok {
+			actionfns = append(actionfns, bufAction)
+			names = append(names, name)
 		}
-		actionfns = append(actionfns, afn)
 	}
-	bufAction := func(h *BufPane, te *tcell.EventMouse) bool {
+
+	bufAction := createBufAction(actionfns, names, types)
+	switch e := k.(type) {
+	case KeyEvent, KeySequenceEvent, RawEvent:
+		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
+			return bufAction(h, nil)
+		}))
+	case MouseEvent:
+		BufBindings.RegisterMouseBinding(e, BufMouseActionGeneral(bufAction))
+	}
+}
+
+func commandToAction(a string, k Event) (BufAction, string, bool) {
+	var afn BufAction
+	if strings.HasPrefix(a, "command:") {
+		afn = CommandAction(strings.SplitN(a, ":", 2)[1])
+		return afn, "", true
+	} else if strings.HasPrefix(a, "command-edit:") {
+		afn = CommandEditAction(strings.SplitN(a, ":", 2)[1])
+		return afn, "", true
+	} else if strings.HasPrefix(a, "lua:") {
+		fn := strings.SplitN(a, ":", 2)[1]
+		afn = LuaAction(fn, k)
+		if afn == nil {
+			screen.TermMessage("Lua Error:", a, "does not exist")
+			return nil, "", false
+		}
+		split := strings.SplitN(fn, ".", 2)
+		if len(split) > 1 {
+			fn = strings.Title(split[0]) + strings.Title(split[1])
+		} else {
+			fn = strings.Title(fn)
+		}
+		return afn, fn, true
+	} else if fn, ok := BufKeyActions[a]; ok {
+		return fn, a, true
+	} else if fn, ok := BufMouseActions[a]; ok {
+		return fn, a, true
+	} else {
+		screen.TermMessage("Error in bindings: action", a, "does not exist")
+		return nil, "", false
+	}
+}
+
+func createBufAction(actionfns []BufAction, names []string, types []byte) func(h *BufPane, te *tcell.EventMouse) bool {
+	return func(h *BufPane, te *tcell.EventMouse) bool {
 		for i, a := range actionfns {
 			var success bool
 			if _, ok := MultiActions[names[i]]; ok {
@@ -175,15 +186,6 @@ func BufMapEvent(k Event, action string) {
 			}
 		}
 		return true
-	}
-
-	switch e := k.(type) {
-	case KeyEvent, KeySequenceEvent, RawEvent:
-		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
-			return bufAction(h, nil)
-		}))
-	case MouseEvent:
-		BufBindings.RegisterMouseBinding(e, BufMouseActionGeneral(bufAction))
 	}
 }
 
