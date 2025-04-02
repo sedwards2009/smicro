@@ -454,6 +454,7 @@ func main() {
 
 	actionChan = make(chan string, 1)
 	action.TopMenuBar.SetActionChan(actionChan)
+	action.TopMenuBar.InitBindings()
 
 	for {
 		DoEvent()

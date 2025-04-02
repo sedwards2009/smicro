@@ -2,6 +2,7 @@ package action
 
 import (
 	"github.com/micro-editor/tcell/v2"
+	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/display"
 	"github.com/zyedidia/micro/v2/internal/screen"
 )
@@ -20,6 +21,13 @@ type topMenuDefinition struct {
 var topMenus []topMenuDefinition
 var topMenuNames []string
 
+func NewMenuBar() *MenuBar {
+	m := new(MenuBar)
+	m.menuBar = display.NewMenuBar(topMenuNames)
+	m.menu = NewMenu()
+	return m
+}
+
 func init() {
 	topMenus = []topMenuDefinition{
 		{
@@ -27,7 +35,6 @@ func init() {
 			menuDefinition: &[]display.MenuDefinition{
 				{
 					Title:      "New",
-					Shortcut:   "Ctrl+t",
 					ActionName: "AddTab",
 				},
 				{
@@ -36,17 +43,14 @@ func init() {
 				},
 
 				{
-					Title:    "",
-					Shortcut: "",
+					Title: "",
 				},
 				{
 					Title:      "Open...",
-					Shortcut:   "Ctrl+o",
 					ActionName: "OpenFile",
 				},
 				{
 					Title:      "Save",
-					Shortcut:   "Ctrl+s",
 					ActionName: "Save",
 				},
 				{
@@ -55,16 +59,7 @@ func init() {
 				},
 				{
 					Title:      "Close",
-					Shortcut:   "Ctrl+q",
 					ActionName: "Quit",
-				},
-				{
-					Title:    "",
-					Shortcut: "",
-				},
-				{
-					Title:      "Quit",
-					ActionName: "QuitAll",
 				},
 			},
 		},
@@ -73,50 +68,40 @@ func init() {
 			menuDefinition: &[]display.MenuDefinition{
 				{
 					Title:      "Undo",
-					Shortcut:   "Ctrl+z",
 					ActionName: "Undo",
 				},
 				{
 					Title:      "Redo",
-					Shortcut:   "Ctrl+y",
 					ActionName: "Redo",
 				},
 				{
-					Title:    "",
-					Shortcut: "",
+					Title: "",
 				},
 				{
 					Title:      "Cut",
-					Shortcut:   "Ctrl+x",
-					ActionName: "Cut",
+					ActionName: "Cut|CutLine",
 				},
 				{
 					Title:      "Copy",
-					Shortcut:   "Ctrl+c",
-					ActionName: "Copy",
+					ActionName: "Copy|CopyLine",
 				},
 				{
 					Title:      "Paste",
-					Shortcut:   "Ctrl+v",
 					ActionName: "Paste",
 				},
 				{
-					Title:    "",
-					Shortcut: "",
+					Title: "",
 				},
 				{
 					Title:      "Find...",
-					Shortcut:   "Ctrl+f",
 					ActionName: "Find",
 				},
 				{
 					Title:      "Find Next",
-					Shortcut:   "Ctrl+n",
 					ActionName: "FindNext",
 				},
 				{
 					Title:      "Find Previous",
-					Shortcut:   "Ctrl+p",
 					ActionName: "FindPrevious",
 				},
 			},
@@ -134,27 +119,22 @@ func init() {
 				},
 				{
 					Title:      "Spawn Cursors on Selection",
-					Shortcut:   "Alt+m",
 					ActionName: "SpawnMultiCursorSelect",
 				},
 				{
 					Title:      "Spawn Cursor Up",
-					Shortcut:   "Alt+Shift+Up",
 					ActionName: "SpawnMultiCursorUp",
 				},
 				{
 					Title:      "Spawn Cursor Down",
-					Shortcut:   "Alt+Shift+Down",
 					ActionName: "SpawnMultiCursorDown",
 				},
 				{
 					Title:      "Remove Cursor",
-					Shortcut:   "Alt-p",
 					ActionName: "RemoveMultiCursor",
 				},
 				{
 					Title:      "Remove All Cursors",
-					Shortcut:   "Alt-c",
 					ActionName: "RemoveAllMultiCursors",
 				},
 			},
@@ -164,17 +144,14 @@ func init() {
 			menuDefinition: &[]display.MenuDefinition{
 				{
 					Title:      "Go to Line...",
-					Shortcut:   "Ctrl+l",
 					ActionName: "command-edit:goto ",
 				},
 				{
 					Title:      "Go to Next Paragraph",
-					Shortcut:   "Alt+}",
 					ActionName: "ParagraphNext",
 				},
 				{
 					Title:      "Go to Previous Paragraph",
-					Shortcut:   "Alt+{",
 					ActionName: "ParagraphPrevious",
 				},
 				{
@@ -183,22 +160,18 @@ func init() {
 				},
 				{
 					Title:      "Go to Next Tab",
-					Shortcut:   "Alt-.",
 					ActionName: "NextTab|FirstTab",
 				},
 				{
 					Title:      "Go to Previous Tab",
-					Shortcut:   "Alt-,",
 					ActionName: "PreviousTab|LastTab",
 				},
 				{
 					Title:      "Go to Next Diff",
-					Shortcut:   "Alt-]",
 					ActionName: "DiffNext|CursorEnd",
 				},
 				{
 					Title:      "Go to Previous Diff",
-					Shortcut:   "Alt-[",
 					ActionName: "DiffPrevious|CursorStart",
 				},
 			},
@@ -219,11 +192,31 @@ func init() {
 	}
 }
 
-func NewMenuBar() *MenuBar {
-	m := new(MenuBar)
-	m.menuBar = display.NewMenuBar(topMenuNames)
-	m.menu = NewMenu()
-	return m
+func (m *MenuBar) InitBindings() {
+	for i := range topMenus {
+		menu := &topMenus[i]
+		for j := range *menu.menuDefinition {
+			item := &(*menu.menuDefinition)[j]
+			if item.ActionName != "" {
+				item.Shortcut = actionToKeyBinding(item.ActionName)
+			}
+		}
+	}
+}
+
+func actionToKeyBinding(actionName string) string {
+	result := ""
+	for _, category := range config.Bindings {
+		for key, action := range category {
+			if action == actionName {
+				result = key
+				if result[0] != 'F' { // Bias the search to favour non function key bindings
+					return key
+				}
+			}
+		}
+	}
+	return result
 }
 
 func (m *MenuBar) SetActionChan(actionChan chan string) {
