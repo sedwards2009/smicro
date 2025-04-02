@@ -152,6 +152,10 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 	t.List[t.Active()].HandleEvent(event)
 }
 
+func (t *TabList) ExecAction(actionName string) {
+	t.List[t.Active()].ExecAction(actionName)
+}
+
 // Display updates the names and then displays the tab bar
 func (t *TabList) Display() {
 	t.UpdateNames()
@@ -349,6 +353,10 @@ func (t *Tab) HandleEvent(event tcell.Event) {
 
 	}
 	t.Panes[t.active].HandleEvent(event)
+}
+
+func (t *Tab) ExecAction(actionName string) {
+	t.Panes[t.active].ExecAction(actionName)
 }
 
 // SetActive changes the currently active pane to the specified index

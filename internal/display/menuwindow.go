@@ -7,8 +7,9 @@ import (
 )
 
 type MenuDefinition struct {
-	Title    string
-	Shortcut string
+	Title      string
+	Shortcut   string
+	ActionName string
 }
 
 type MenuWindow struct {
@@ -69,17 +70,23 @@ func (d *MenuWindow) Display() {
 }
 
 func measureWidths(menuDefinition *[]MenuDefinition) (int, int) {
-	maxWidth := 0
+	maxTitleWidth := 0
 	maxShortcutWidth := 0
 	for _, item := range *menuDefinition {
 		width := runewidth.StringWidth(item.Title)
-		if width > maxWidth {
-			maxWidth = width
+		if width > maxTitleWidth {
+			maxTitleWidth = width
 		}
 		shortCutWidth := runewidth.StringWidth(item.Shortcut)
 		if shortCutWidth > maxShortcutWidth {
 			maxShortcutWidth = shortCutWidth
 		}
 	}
-	return maxWidth, maxShortcutWidth
+	return maxTitleWidth, maxShortcutWidth
+}
+
+func (d *MenuWindow) Position() (x int, y int, w int, h int) {
+	titleWidth, shortcutWidth := measureWidths(d.MenuDefinition)
+	totalWidth := 2 + titleWidth + 2 + shortcutWidth + 2
+	return d.X, d.Y, totalWidth, 2 + len(*d.MenuDefinition)
 }

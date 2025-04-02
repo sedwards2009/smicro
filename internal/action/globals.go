@@ -10,16 +10,13 @@ var InfoBar *InfoPane
 // LogBufPane is a global log buffer.
 var LogBufPane *BufPane
 
-var PopUpDialog *Menu
-
 var TopMenuBar *MenuBar
 
 // InitGlobals initializes the log buffer and the info bar
 func InitGlobals() {
 	InfoBar = NewInfoBar()
 	buffer.LogBuf = buffer.NewBufferFromString("", "Log", buffer.BTLog)
-	PopUpDialog = NewMenu()
-	TopMenuBar = NewMenuBar(PopUpDialog)
+	TopMenuBar = NewMenuBar()
 }
 
 // GetInfoBar returns the infobar pane

@@ -185,4 +185,5 @@ func ConstructEvent(event tcell.Event) (Event, error) {
 type Handler interface {
 	HandleEvent(tcell.Event)
 	HandleCommand(string)
+	ExecAction(actionName string) bool
 }

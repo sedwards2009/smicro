@@ -190,6 +190,10 @@ func (t *TermPane) HandleEvent(event tcell.Event) {
 	}
 }
 
+func (t *TermPane) ExecAction(actionName string) bool {
+	return false
+}
+
 // HandleTermClose is called when a terminal has finished its job
 // and should be closed. If that terminal is this termpane's terminal,
 // HandleTermClose will close the terminal and the termpane itself.

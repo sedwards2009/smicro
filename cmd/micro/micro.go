@@ -42,7 +42,8 @@ var (
 
 	sighup chan os.Signal
 
-	timerChan chan func()
+	timerChan  chan func()
+	actionChan chan string
 )
 
 func InitFlags() {
@@ -451,6 +452,9 @@ func main() {
 		// time out after 10ms
 	}
 
+	actionChan = make(chan string, 1)
+	action.TopMenuBar.SetActionChan(actionChan)
+
 	for {
 		DoEvent()
 	}
@@ -470,7 +474,6 @@ func DoEvent() {
 	action.MainTab().Display()
 	action.InfoBar.Display()
 	action.TopMenuBar.Display()
-	action.PopUpDialog.Display()
 	screen.Screen.Show()
 
 	// Check for new events
@@ -493,6 +496,8 @@ func DoEvent() {
 		f()
 	case b := <-buffer.BackupCompleteChan:
 		b.RequestedBackup = false
+	case actionName := <-actionChan:
+		ExecAction(actionName)
 	case <-sighup:
 		exit(0)
 	case <-util.Sigterm:
@@ -514,8 +519,8 @@ func DoEvent() {
 		if resize {
 			action.InfoBar.HandleEvent(event)
 			action.Tabs.HandleEvent(event)
-		} else if action.PopUpDialog.IsOpen {
-			action.PopUpDialog.HandleEvent(event)
+		} else if action.TopMenuBar.IsOpen() {
+			action.TopMenuBar.HandleEvent(event)
 		} else if action.InfoBar.HasPrompt {
 			action.InfoBar.HandleEvent(event)
 		} else {
@@ -528,4 +533,9 @@ func DoEvent() {
 	if err != nil {
 		screen.TermMessage(err)
 	}
+}
+
+func ExecAction(actionName string) {
+	action.InfoBar.ExecAction(actionName)
+	action.Tabs.ExecAction(actionName)
 }

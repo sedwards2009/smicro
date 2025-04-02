@@ -45,7 +45,7 @@ func init() {
 
 // LuaAction makes an action from a lua function. It returns either a BufKeyAction
 // or a BufMouseAction depending on the event type.
-func LuaAction(fn string, k Event) BufAction {
+func LuaAction(fn string) BufAction {
 	luaFn := strings.Split(fn, ".")
 	if len(luaFn) <= 1 {
 		return nil
@@ -80,7 +80,18 @@ func LuaAction(fn string, k Event) BufAction {
 // BufMapEvent maps an event to an action
 func BufMapEvent(k Event, actionName string) {
 	config.Bindings["buffer"][k.Name()] = actionName
+	bufAction := actionToBufAction(actionName)
+	switch e := k.(type) {
+	case KeyEvent, KeySequenceEvent, RawEvent:
+		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
+			return bufAction(h, nil)
+		}))
+	case MouseEvent:
+		BufBindings.RegisterMouseBinding(e, BufMouseActionGeneral(bufAction))
+	}
+}
 
+func actionToBufAction(actionName string) BufAction {
 	var actionfns []BufAction
 	var names []string
 	var types []byte // list of either '&', '|', ' '
@@ -96,22 +107,14 @@ func BufMapEvent(k Event, actionName string) {
 			actionName = ""
 		}
 
-		bufAction, name, ok := commandToAction(a, k)
+		bufAction, name, ok := commandToAction(a)
 		if ok {
 			actionfns = append(actionfns, bufAction)
 			names = append(names, name)
 		}
 	}
 
-	bufAction := createBufAction(actionfns, names, types)
-	switch e := k.(type) {
-	case KeyEvent, KeySequenceEvent, RawEvent:
-		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
-			return bufAction(h, nil)
-		}))
-	case MouseEvent:
-		BufBindings.RegisterMouseBinding(e, BufMouseActionGeneral(bufAction))
-	}
+	return createBufAction(actionfns, names, types)
 }
 
 func wrapBufKeyAction(bka BufKeyAction) BufAction {
@@ -120,7 +123,7 @@ func wrapBufKeyAction(bka BufKeyAction) BufAction {
 	}
 }
 
-func commandToAction(a string, k Event) (BufAction, string, bool) {
+func commandToAction(a string) (BufAction, string, bool) {
 	var afn BufAction
 	if strings.HasPrefix(a, "command:") {
 		afn = wrapBufKeyAction(CommandAction(strings.SplitN(a, ":", 2)[1]))
@@ -130,7 +133,7 @@ func commandToAction(a string, k Event) (BufAction, string, bool) {
 		return afn, "", true
 	} else if strings.HasPrefix(a, "lua:") {
 		fn := strings.SplitN(a, ":", 2)[1]
-		afn = LuaAction(fn, k)
+		afn = LuaAction(fn)
 		if afn == nil {
 			screen.TermMessage("Lua Error:", a, "does not exist")
 			return nil, "", false
@@ -152,7 +155,7 @@ func commandToAction(a string, k Event) (BufAction, string, bool) {
 	}
 }
 
-func createBufAction(actionfns []BufAction, names []string, types []byte) func(h *BufPane, te *tcell.EventMouse) bool {
+func createBufAction(actionfns []BufAction, names []string, types []byte) BufAction {
 	return func(h *BufPane, te *tcell.EventMouse) bool {
 		for i, a := range actionfns {
 			var success bool
@@ -531,6 +534,11 @@ func (h *BufPane) Bindings() *KeyTree {
 		return h.bindings
 	}
 	return BufBindings
+}
+
+func (h *BufPane) ExecAction(actionName string) bool {
+	action := actionToBufAction(actionName)
+	return action(h, nil)
 }
 
 // DoKeyEvent executes a key event by finding the action it is bound

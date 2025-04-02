@@ -8,6 +8,7 @@ import (
 type Menu struct {
 	menuWindow *display.MenuWindow
 	IsOpen     bool
+	actionChan chan string
 }
 
 func NewMenu() *Menu {
@@ -15,6 +16,10 @@ func NewMenu() *Menu {
 	d.menuWindow = display.NewMenuWindow()
 	d.IsOpen = false
 	return d
+}
+
+func (m *Menu) SetActionChan(actionChan chan string) {
+	m.actionChan = actionChan
 }
 
 func (d *Menu) Open(x int, y int, menuDefinition *[]display.MenuDefinition) {
@@ -47,7 +52,38 @@ func (d *Menu) HandleEvent(event tcell.Event) {
 			d.menuWindow.SelectedRow = d.nextMenuItem(-1)
 		case tcell.KeyDown:
 			d.menuWindow.SelectedRow = d.nextMenuItem(1)
+		case tcell.KeyEnter:
+			row := d.menuWindow.SelectedRow
+			d.executeMenuItem(row)
 		}
+
+	case *tcell.EventMouse:
+		if e.Buttons() == tcell.Button1 {
+			x, y, w, h := d.menuWindow.Position()
+			mx, my := e.Position()
+			// Check if the mouse is within the menu window
+			inside := mx >= x && mx < x+w && my >= y && my < y+h
+			if !inside {
+				d.IsOpen = false
+			} else {
+				// Execute the menu item
+				row := my - y - 1
+				if row >= 0 && row < len(*d.menuWindow.MenuDefinition) {
+					d.executeMenuItem(row)
+				}
+			}
+		}
+	}
+}
+
+func (d *Menu) executeMenuItem(row int) {
+	menuDefinition := (*d.menuWindow.MenuDefinition)[row]
+	if menuDefinition.Title != "" {
+		actionName := menuDefinition.ActionName
+		if actionName != "" {
+			d.actionChan <- actionName
+		}
+		d.IsOpen = false
 	}
 }
 
