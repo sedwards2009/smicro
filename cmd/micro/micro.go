@@ -537,6 +537,8 @@ func DoEvent() {
 }
 
 func ExecAction(actionName string) {
-	action.InfoBar.ExecAction(actionName)
+	if action.InfoBar.ExecAction(actionName) {
+		return
+	}
 	action.Tabs.ExecAction(actionName)
 }

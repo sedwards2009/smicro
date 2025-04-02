@@ -80,7 +80,10 @@ func LuaAction(fn string) BufAction {
 // BufMapEvent maps an event to an action
 func BufMapEvent(k Event, actionName string) {
 	config.Bindings["buffer"][k.Name()] = actionName
-	bufAction := actionToBufAction(actionName)
+	bufAction, ok := actionToBufAction(actionName)
+	if !ok {
+		return
+	}
 	switch e := k.(type) {
 	case KeyEvent, KeySequenceEvent, RawEvent:
 		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
@@ -91,7 +94,7 @@ func BufMapEvent(k Event, actionName string) {
 	}
 }
 
-func actionToBufAction(actionName string) BufAction {
+func actionToBufAction(actionName string) (BufAction, bool) {
 	var actionfns []BufAction
 	var names []string
 	var types []byte // list of either '&', '|', ' '
@@ -113,8 +116,10 @@ func actionToBufAction(actionName string) BufAction {
 			names = append(names, name)
 		}
 	}
-
-	return createBufAction(actionfns, names, types)
+	if len(actionfns) == 0 {
+		return nil, false
+	}
+	return createBufAction(actionfns, names, types), true
 }
 
 func wrapBufKeyAction(bka BufKeyAction) BufAction {
@@ -537,7 +542,10 @@ func (h *BufPane) Bindings() *KeyTree {
 }
 
 func (h *BufPane) ExecAction(actionName string) bool {
-	action := actionToBufAction(actionName)
+	action, ok := actionToBufAction(actionName)
+	if !ok {
+		return false
+	}
 	return action(h, nil)
 }
 
