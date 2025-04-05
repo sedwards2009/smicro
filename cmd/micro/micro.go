@@ -537,7 +537,7 @@ func DoEvent() {
 }
 
 func ExecAction(actionName string) {
-	if action.InfoBar.ExecAction(actionName) {
+	if _, exits := action.InfoKeyActions[actionName]; exits && action.InfoBar.ExecAction(actionName) {
 		return
 	}
 	action.Tabs.ExecAction(actionName)
