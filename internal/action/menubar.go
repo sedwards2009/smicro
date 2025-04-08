@@ -41,7 +41,6 @@ func init() {
 					Title:      "New Terminal...",
 					ActionName: "command-edit:term ",
 				},
-
 				{
 					Title: "",
 				},
@@ -147,6 +146,10 @@ func init() {
 					ActionName: "command-edit:goto ",
 				},
 				{
+					Title:      "Jump...",
+					ActionName: "command-edit:jump ",
+				},
+				{
 					Title:      "Go to Next Paragraph",
 					ActionName: "ParagraphNext",
 				},
@@ -182,6 +185,38 @@ func init() {
 				{
 					Title:      "Help",
 					ActionName: "ToggleHelp",
+				},
+				{
+					Title:      "Colors",
+					ActionName: "command:help colors",
+				},
+				{
+					Title:      "Default keys",
+					ActionName: "command:help defaultkeys",
+				},
+				{
+					Title:      "Options",
+					ActionName: "command:help options",
+				},
+				{
+					Title:      "Commands",
+					ActionName: "command:help commands",
+				},
+				{
+					Title:      "Plugins",
+					ActionName: "command:help plugins",
+				},
+				{
+					Title:      "Copy & Paste",
+					ActionName: "command:help copypaste",
+				},
+				{
+					Title:      "Keybindings",
+					ActionName: "command:help keybindings",
+				},
+				{
+					Title:      "Tutorial",
+					ActionName: "command:help tutorial",
 				},
 			},
 		},
