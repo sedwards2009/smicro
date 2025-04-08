@@ -2342,3 +2342,8 @@ func (h *BufPane) RemoveAllMultiCursors() bool {
 func (h *BufPane) None() bool {
 	return true
 }
+
+func (h *BufPane) OpenMenu() bool {
+	TopMenuBar.OpenMenu()
+	return true
+}

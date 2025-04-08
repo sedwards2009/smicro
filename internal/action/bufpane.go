@@ -858,6 +858,7 @@ var BufKeyActions = map[string]BufKeyAction{
 	"Deselect":                  (*BufPane).Deselect,
 	"ClearInfo":                 (*BufPane).ClearInfo,
 	"None":                      (*BufPane).None,
+	"OpenMenu":                  (*BufPane).OpenMenu,
 
 	// This was changed to InsertNewline but I don't want to break backwards compatibility
 	"InsertEnter": (*BufPane).InsertNewline,

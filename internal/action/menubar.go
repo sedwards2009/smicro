@@ -318,3 +318,10 @@ func (m *MenuBar) HandleEvent(event tcell.Event) {
 		m.menuBar.SetSelected(-1)
 	}
 }
+
+func (m *MenuBar) OpenMenu() {
+	leftX := m.menuBar.MenuIndexLeft(0)
+	m.menu.Open(leftX, 1, topMenus[0].menuDefinition)
+	m.menuBar.SetSelected(0)
+	m.selectedIndex = 0
+}
