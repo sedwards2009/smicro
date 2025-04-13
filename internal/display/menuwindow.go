@@ -40,10 +40,33 @@ func drawText(x int, y int, text string, style tcell.Style) {
 	}
 }
 
+func (d *MenuWindow) MoveOnScreen() {
+	if d.X < 0 {
+		d.X = 0
+	}
+	if d.Y < 0 {
+		d.Y = 0
+	}
+
+	menuWidth := d.menuWidthInCells(d.MenuDefinition)
+	width, height := screen.Screen.Size()
+	if d.X+menuWidth > width {
+		d.X = width - menuWidth
+	}
+	if d.Y+len(*d.MenuDefinition)+2 > height {
+		d.Y = height - len(*d.MenuDefinition) + 2
+	}
+}
+
+func (d *MenuWindow) menuWidthInCells(md *[]MenuDefinition) int {
+	titleWidth, shortcutWidth := measureWidths(md)
+	return 1 + 1 + titleWidth + 2 + shortcutWidth + 1 + 1
+}
+
 func (d *MenuWindow) Display() {
-	titleWidth, shortcutWidth := measureWidths(d.MenuDefinition)
+	titleWidth, _ := measureWidths(d.MenuDefinition)
 	y := d.Y
-	menuWidth := 1 + 1 + titleWidth + 2 + shortcutWidth + 1 + 1
+	menuWidth := d.menuWidthInCells(d.MenuDefinition)
 
 	backgroundColor := tcell.ColorNavy
 	borderStyle := tcell.Style{}.Foreground(tcell.ColorWhite).Background(backgroundColor).Bold(true)

@@ -28,6 +28,7 @@ func (d *Menu) Open(x int, y int, menuDefinition *[]display.MenuDefinition) {
 	d.menuWindow.Y = y
 	d.menuWindow.MenuDefinition = menuDefinition
 	d.menuWindow.SelectedRow = 0
+	d.menuWindow.MoveOnScreen()
 }
 
 func (d *Menu) Display() {
