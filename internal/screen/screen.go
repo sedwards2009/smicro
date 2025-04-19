@@ -183,10 +183,8 @@ func TempStart(screenWasNil bool) {
 func Init() error {
 	drawChan = make(chan bool, 8)
 
-	// Should we enable true color?
-	truecolor := os.Getenv("MICRO_TRUECOLOR") == "1"
-
-	if !truecolor {
+	// allow forceful opt-out of true colors
+	if os.Getenv("MICRO_TRUECOLOR") == "0" {
 		os.Setenv("TCELL_TRUECOLOR", "disable")
 	}
 
