@@ -90,6 +90,11 @@ func (d *MenuWindow) Display() {
 	}
 
 	drawHorizontalLine(d.X, y, menuWidth, borderStyle, borderStyle, '└', '─', '┘')
+
+	// Draw the drop shadow
+	drawDimVerticalLine(d.X+menuWidth, d.Y+1, len(*d.MenuDefinition)+1)
+	drawDimVerticalLine(d.X+menuWidth+1, d.Y+1, len(*d.MenuDefinition)+1)
+	drawDimHorizontalLine(d.X+2, y+1, menuWidth)
 }
 
 func measureWidths(menuDefinition *[]MenuDefinition) (int, int) {
@@ -112,4 +117,30 @@ func (d *MenuWindow) Position() (x int, y int, w int, h int) {
 	titleWidth, shortcutWidth := measureWidths(d.MenuDefinition)
 	totalWidth := 2 + titleWidth + 2 + shortcutWidth + 2
 	return d.X, d.Y, totalWidth, 2 + len(*d.MenuDefinition)
+}
+
+func dimCell(x int, y int) {
+	cellRune, cellRunes, style := screen.GetContent(x, y)
+	fg, bg, _ := style.Decompose()
+
+	fgR, fgG, fgB := fg.TrueColor().RGB()
+	fg = tcell.NewRGBColor(fgR/2, fgG/2, fgB/2)
+
+	bgR, bgG, bgB := bg.TrueColor().RGB()
+	bg = tcell.NewRGBColor(bgR/2, bgG/2, bgB/2)
+
+	style = style.Foreground(fg).Background(bg)
+	screen.SetContent(x, y, cellRune, cellRunes, style)
+}
+
+func drawDimHorizontalLine(x int, y int, length int) {
+	for i := 0; i < length; i++ {
+		dimCell(x+i, y)
+	}
+}
+
+func drawDimVerticalLine(x int, y int, length int) {
+	for i := 0; i < length; i++ {
+		dimCell(x, y+i)
+	}
 }
