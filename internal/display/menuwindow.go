@@ -3,6 +3,7 @@ package display
 import (
 	runewidth "github.com/mattn/go-runewidth"
 	"github.com/micro-editor/tcell/v2"
+	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/screen"
 )
 
@@ -68,8 +69,7 @@ func (d *MenuWindow) Display() {
 	y := d.Y
 	menuWidth := d.menuWidthInCells(d.MenuDefinition)
 
-	backgroundColor := tcell.ColorNavy
-	borderStyle := tcell.Style{}.Foreground(tcell.ColorWhite).Background(backgroundColor).Bold(true)
+	borderStyle := config.Colorscheme["tabbar"]
 
 	drawHorizontalLine(d.X, y, menuWidth, borderStyle, borderStyle, '┌', '─', '┐')
 	y++

@@ -3,6 +3,7 @@ package display
 import (
 	runewidth "github.com/mattn/go-runewidth"
 	"github.com/micro-editor/tcell/v2"
+	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/screen"
 )
 
@@ -22,8 +23,7 @@ func NewMenuBar(menuNames []string) *MenuBar {
 }
 
 func (m *MenuBar) Display() {
-	tabBarColor := tcell.ColorNavy
-	tabBarStyle := tcell.Style{}.Foreground(tcell.ColorWhite).Background(tabBarColor)
+	tabBarStyle := config.Colorscheme["tabbar"]
 
 	w, _ := screen.Screen.Size()
 

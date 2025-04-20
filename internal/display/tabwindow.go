@@ -4,6 +4,7 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 	"github.com/micro-editor/tcell/v2"
 	"github.com/zyedidia/micro/v2/internal/buffer"
+	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/util"
 )
@@ -96,15 +97,17 @@ func (w *TabWindow) Display() {
 	x := -w.hscroll
 	done := false
 
-	tabBarColor := tcell.ColorNavy
+	tabBarStyle := config.Colorscheme["tabbar"]
+	_, tabBarBg, _ := tabBarStyle.Decompose()
 
-	tabCornerStyle := tcell.Style{}.Foreground(tcell.ColorBlack).Background(tabBarColor).Bold(false)
-	tabTextStyle := tcell.Style{}.Foreground(tcell.ColorWhite).Background(tcell.ColorBlack).Bold(true)
+	tabStyle := config.Colorscheme["tab"]
+	_, tabBg, _ := tabStyle.Decompose()
 
-	tabCornerNonactiveStyle := tabCornerStyle.Foreground(tcell.ColorGray).Background(tabBarColor).Bold(false)
-	tabTextNonwactiveStyle := tcell.Style{}.Foreground(tcell.ColorLightGrey).Background(tcell.ColorGrey).Bold(false)
+	tabInactiveStyle := config.Colorscheme["tab.inactive"]
+	_, tabInactiveBg, _ := tabInactiveStyle.Decompose()
 
-	tabBarStyle := tcell.Style{}.Foreground(tcell.ColorBlack).Background(tabBarColor).Bold(true)
+	tabCornerStyle := tcell.Style{}.Foreground(tabBg).Background(tabBarBg)
+	tabCornerInactiveStyle := tcell.Style{}.Foreground(tabInactiveBg).Background(tabBarBg)
 
 	draw := func(r rune, n int, style tcell.Style) {
 		for i := 0; i < n; i++ {
@@ -129,11 +132,11 @@ func (w *TabWindow) Display() {
 	}
 
 	for i, n := range w.Names {
-		currentTabCornerStyle := tabCornerNonactiveStyle
-		currentTabTextStyle := tabTextNonwactiveStyle
+		currentTabCornerStyle := tabCornerInactiveStyle
+		currentTabTextStyle := tabInactiveStyle
 		if i == w.active {
 			currentTabCornerStyle = tabCornerStyle
-			currentTabTextStyle = tabTextStyle
+			currentTabTextStyle = tabStyle
 		}
 
 		draw('◢', 1, currentTabCornerStyle)
