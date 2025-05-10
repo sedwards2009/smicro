@@ -4,13 +4,13 @@ import (
 	"errors"
 	"runtime"
 
+	"github.com/micro-editor/tcell/v2"
+	"github.com/micro-editor/terminal"
 	"github.com/zyedidia/micro/v2/internal/clipboard"
 	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/display"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/shell"
-	"github.com/micro-editor/tcell/v2"
-	"github.com/micro-editor/terminal"
 )
 
 type TermKeyAction func(*TermPane)
@@ -28,14 +28,14 @@ func TermKeyActionGeneral(a TermKeyAction) PaneKeyAction {
 	}
 }
 
-func TermMapEvent(k Event, action string) {
-	config.Bindings["terminal"][k.Name()] = action
+func TermMapEvent(k Event, actionName string) {
+	config.Bindings["terminal"][k.Name()] = actionName
 
 	switch e := k.(type) {
 	case KeyEvent, KeySequenceEvent, RawEvent:
-		termMapKey(e, action)
+		termMapKey(e, actionName)
 	case MouseEvent:
-		termMapMouse(e, action)
+		termMapMouse(e, actionName)
 	}
 }
 
@@ -188,6 +188,10 @@ func (t *TermPane) HandleEvent(event tcell.Event) {
 			t.mouseReleased = true
 		}
 	}
+}
+
+func (t *TermPane) ExecAction(actionName string) bool {
+	return false
 }
 
 // HandleTermClose is called when a terminal has finished its job

@@ -6,6 +6,7 @@ import (
 
 	luar "layeh.com/gopher-luar"
 
+	"github.com/micro-editor/tcell/v2"
 	lua "github.com/yuin/gopher-lua"
 	"github.com/zyedidia/micro/v2/internal/buffer"
 	"github.com/zyedidia/micro/v2/internal/config"
@@ -13,16 +14,13 @@ import (
 	ulua "github.com/zyedidia/micro/v2/internal/lua"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
-type BufAction interface{}
+// BufMouseAction is an action that must be bound to a mouse event.
+type BufAction func(*BufPane, *tcell.EventMouse) bool
 
 // BufKeyAction represents an action bound to a key.
 type BufKeyAction func(*BufPane) bool
-
-// BufMouseAction is an action that must be bound to a mouse event.
-type BufMouseAction func(*BufPane, *tcell.EventMouse) bool
 
 // BufBindings stores the bindings for the buffer pane type.
 var BufBindings *KeyTree
@@ -35,7 +33,7 @@ func BufKeyActionGeneral(a BufKeyAction) PaneKeyAction {
 }
 
 // BufMouseActionGeneral makes a general pane mouse action from a BufKeyAction.
-func BufMouseActionGeneral(a BufMouseAction) PaneMouseAction {
+func BufMouseActionGeneral(a BufAction) PaneMouseAction {
 	return func(p Pane, me *tcell.EventMouse) bool {
 		return a(p.(*BufPane), me)
 	}
@@ -47,7 +45,7 @@ func init() {
 
 // LuaAction makes an action from a lua function. It returns either a BufKeyAction
 // or a BufMouseAction depending on the event type.
-func LuaAction(fn string, k Event) BufAction {
+func LuaAction(fn string) BufAction {
 	luaFn := strings.Split(fn, ".")
 	if len(luaFn) <= 1 {
 		return nil
@@ -58,96 +56,112 @@ func LuaAction(fn string, k Event) BufAction {
 		return nil
 	}
 
-	var action BufAction
-	switch k.(type) {
-	case KeyEvent, KeySequenceEvent, RawEvent:
-		action = BufKeyAction(func(h *BufPane) bool {
-			val, err := pl.Call(plFn, luar.New(ulua.L, h))
-			if err != nil {
-				screen.TermMessage(err)
-			}
-			if v, ok := val.(lua.LBool); !ok {
-				return false
-			} else {
-				return bool(v)
-			}
-		})
-	case MouseEvent:
-		action = BufMouseAction(func(h *BufPane, te *tcell.EventMouse) bool {
-			val, err := pl.Call(plFn, luar.New(ulua.L, h), luar.New(ulua.L, te))
-			if err != nil {
-				screen.TermMessage(err)
-			}
-			if v, ok := val.(lua.LBool); !ok {
-				return false
-			} else {
-				return bool(v)
-			}
-		})
+	action := func(h *BufPane, te *tcell.EventMouse) bool {
+		var val lua.LValue
+		var err error
+		if te == nil {
+			val, err = pl.Call(plFn, luar.New(ulua.L, h))
+
+		} else {
+			val, err = pl.Call(plFn, luar.New(ulua.L, h), luar.New(ulua.L, te))
+		}
+		if err != nil {
+			screen.TermMessage(err)
+		}
+		if v, ok := val.(lua.LBool); !ok {
+			return false
+		} else {
+			return bool(v)
+		}
 	}
 	return action
 }
 
 // BufMapEvent maps an event to an action
-func BufMapEvent(k Event, action string) {
-	config.Bindings["buffer"][k.Name()] = action
+func BufMapEvent(k Event, actionName string) {
+	config.Bindings["buffer"][k.Name()] = actionName
+	bufAction, ok := actionToBufAction(actionName)
+	if !ok {
+		return
+	}
+	switch e := k.(type) {
+	case KeyEvent, KeySequenceEvent, RawEvent:
+		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
+			return bufAction(h, nil)
+		}))
+	case MouseEvent:
+		BufBindings.RegisterMouseBinding(e, BufMouseActionGeneral(bufAction))
+	}
+}
 
+func actionToBufAction(actionName string) (BufAction, bool) {
 	var actionfns []BufAction
 	var names []string
-	var types []byte
-	for i := 0; ; i++ {
-		if action == "" {
-			break
-		}
-
-		idx := util.IndexAnyUnquoted(action, "&|,")
-		a := action
+	var types []byte // list of either '&', '|', ' '
+	for actionName != "" {
+		idx := util.IndexAnyUnquoted(actionName, "&|,")
+		a := actionName
 		if idx >= 0 {
-			a = action[:idx]
-			types = append(types, action[idx])
-			action = action[idx+1:]
+			a = actionName[:idx]
+			types = append(types, actionName[idx])
+			actionName = actionName[idx+1:]
 		} else {
 			types = append(types, ' ')
-			action = ""
+			actionName = ""
 		}
 
-		var afn BufAction
-		if strings.HasPrefix(a, "command:") {
-			a = strings.SplitN(a, ":", 2)[1]
-			afn = CommandAction(a)
-			names = append(names, "")
-		} else if strings.HasPrefix(a, "command-edit:") {
-			a = strings.SplitN(a, ":", 2)[1]
-			afn = CommandEditAction(a)
-			names = append(names, "")
-		} else if strings.HasPrefix(a, "lua:") {
-			a = strings.SplitN(a, ":", 2)[1]
-			afn = LuaAction(a, k)
-			if afn == nil {
-				screen.TermMessage("Lua Error:", a, "does not exist")
-				continue
-			}
-			split := strings.SplitN(a, ".", 2)
-			if len(split) > 1 {
-				a = strings.Title(split[0]) + strings.Title(split[1])
-			} else {
-				a = strings.Title(a)
-			}
-
-			names = append(names, a)
-		} else if f, ok := BufKeyActions[a]; ok {
-			afn = f
-			names = append(names, a)
-		} else if f, ok := BufMouseActions[a]; ok {
-			afn = f
-			names = append(names, a)
-		} else {
-			screen.TermMessage("Error in bindings: action", a, "does not exist")
-			continue
+		bufAction, name, ok := commandToAction(a)
+		if ok {
+			actionfns = append(actionfns, bufAction)
+			names = append(names, name)
 		}
-		actionfns = append(actionfns, afn)
 	}
-	bufAction := func(h *BufPane, te *tcell.EventMouse) bool {
+	if len(actionfns) == 0 {
+		return nil, false
+	}
+	return createBufAction(actionfns, names, types), true
+}
+
+func wrapBufKeyAction(bka BufKeyAction) BufAction {
+	return func(h *BufPane, te *tcell.EventMouse) bool {
+		return bka(h)
+	}
+}
+
+func commandToAction(a string) (BufAction, string, bool) {
+	var afn BufAction
+	if strings.HasPrefix(a, "command:") {
+		afn = wrapBufKeyAction(CommandAction(strings.SplitN(a, ":", 2)[1]))
+		return afn, "", true
+	} else if strings.HasPrefix(a, "command-edit:") {
+		afn = wrapBufKeyAction(CommandEditAction(strings.SplitN(a, ":", 2)[1]))
+		return afn, "", true
+	} else if strings.HasPrefix(a, "lua:") {
+		fn := strings.SplitN(a, ":", 2)[1]
+		afn = LuaAction(fn)
+		if afn == nil {
+			screen.TermMessage("Lua Error:", a, "does not exist")
+			return nil, "", false
+		}
+		split := strings.SplitN(fn, ".", 2)
+		if len(split) > 1 {
+			fn = strings.Title(split[0]) + strings.Title(split[1])
+		} else {
+			fn = strings.Title(fn)
+		}
+		return afn, fn, true
+	} else if fn, ok := BufKeyActions[a]; ok {
+		return wrapBufKeyAction(fn), a, true
+	} else if fn, ok := BufMouseActions[a]; ok {
+		return fn, a, true
+	} else {
+		screen.TermMessage("Error in bindings: action", a, "does not exist")
+		return nil, "", false
+	}
+}
+
+func createBufAction(actionfns []BufAction, names []string, types []byte) BufAction {
+	return func(h *BufPane, te *tcell.EventMouse) bool {
 		for i, a := range actionfns {
 			var success bool
 			if _, ok := MultiActions[names[i]]; ok {
@@ -175,15 +189,6 @@ func BufMapEvent(k Event, action string) {
 			}
 		}
 		return true
-	}
-
-	switch e := k.(type) {
-	case KeyEvent, KeySequenceEvent, RawEvent:
-		BufBindings.RegisterKeyBinding(e, BufKeyActionGeneral(func(h *BufPane) bool {
-			return bufAction(h, nil)
-		}))
-	case MouseEvent:
-		BufBindings.RegisterMouseBinding(e, BufMouseActionGeneral(bufAction))
 	}
 }
 
@@ -536,6 +541,14 @@ func (h *BufPane) Bindings() *KeyTree {
 	return BufBindings
 }
 
+func (h *BufPane) ExecAction(actionName string) bool {
+	action, ok := actionToBufAction(actionName)
+	if !ok {
+		return false
+	}
+	return action(h, nil)
+}
+
 // DoKeyEvent executes a key event by finding the action it is bound
 // to and executing it (possibly multiple times for multiple cursors).
 // Returns true if the action was executed OR if there are more keys
@@ -563,15 +576,7 @@ func (h *BufPane) execAction(action BufAction, name string, te *tcell.EventMouse
 		return false
 	}
 
-	var success bool
-	switch a := action.(type) {
-	case BufKeyAction:
-		success = a(h)
-	case BufMouseAction:
-		success = a(h, te)
-	}
-	success = success && h.PluginCB("on"+name)
-
+	success := action(h, te) && h.PluginCB("on"+name)
 	if _, ok := MultiActions[name]; ok {
 		if recordingMacro {
 			if name != "ToggleMacro" && name != "PlayMacro" {
@@ -853,13 +858,14 @@ var BufKeyActions = map[string]BufKeyAction{
 	"Deselect":                  (*BufPane).Deselect,
 	"ClearInfo":                 (*BufPane).ClearInfo,
 	"None":                      (*BufPane).None,
+	"OpenMenu":                  (*BufPane).OpenMenu,
 
 	// This was changed to InsertNewline but I don't want to break backwards compatibility
 	"InsertEnter": (*BufPane).InsertNewline,
 }
 
 // BufMouseActions contains the list of all possible mouse actions the bufhandler could execute
-var BufMouseActions = map[string]BufMouseAction{
+var BufMouseActions = map[string]BufAction{
 	"MousePress":       (*BufPane).MousePress,
 	"MouseDrag":        (*BufPane).MouseDrag,
 	"MouseRelease":     (*BufPane).MouseRelease,

@@ -6,9 +6,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/micro-editor/tcell/v2"
 	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 // Screen is the tcell screen we use to draw to the terminal
@@ -127,6 +127,11 @@ func SetContent(x, y int, mainc rune, combc []rune, style tcell.Style) {
 	}
 }
 
+func GetContent(x, y int) (rune, []rune, tcell.Style) {
+	r, combc, style, _ := Screen.GetContent(x, y)
+	return r, combc, style
+}
+
 // RegisterRawSeq registers a raw escape sequence that should be parsed by tcell
 func RegisterRawSeq(r string) {
 	for _, seq := range rawSeq {
@@ -183,10 +188,8 @@ func TempStart(screenWasNil bool) {
 func Init() error {
 	drawChan = make(chan bool, 8)
 
-	// Should we enable true color?
-	truecolor := os.Getenv("MICRO_TRUECOLOR") == "1"
-
-	if !truecolor {
+	// allow forceful opt-out of true colors
+	if os.Getenv("MICRO_TRUECOLOR") == "0" {
 		os.Setenv("TCELL_TRUECOLOR", "disable")
 	}
 

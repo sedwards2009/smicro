@@ -9,6 +9,8 @@ import (
 	"github.com/zyedidia/micro/v2/internal/util"
 )
 
+const tabNamePadding = 1
+
 type TabWindow struct {
 	Names   []string
 	active  int
@@ -33,7 +35,7 @@ func (w *TabWindow) LocFromVisual(vloc buffer.Loc) int {
 
 	for i, n := range w.Names {
 		x++
-		s := util.CharacterCountInString(n)
+		s := util.CharacterCountInString(n) + 2*tabNamePadding
 		if vloc.Y == w.Y && vloc.X < x+s {
 			return i
 		}
@@ -95,31 +97,19 @@ func (w *TabWindow) Display() {
 	x := -w.hscroll
 	done := false
 
-	globalTabReverse := config.GetGlobalOption("tabreverse").(bool)
-	globalTabHighlight := config.GetGlobalOption("tabhighlight").(bool)
+	tabBarStyle := config.Colorscheme["tabbar"]
+	_, tabBarBg, _ := tabBarStyle.Decompose()
 
-	// xor of reverse and tab highlight to get tab character (as in filename and surrounding characters) reverse state
-	tabCharHighlight := (globalTabReverse || globalTabHighlight) && !(globalTabReverse && globalTabHighlight)
+	tabStyle := config.Colorscheme["tab"]
+	_, tabBg, _ := tabStyle.Decompose()
 
-	reverseStyles := func(reverse bool) (tcell.Style, tcell.Style) {
-		tabBarStyle := config.DefStyle.Reverse(reverse)
-		if style, ok := config.Colorscheme["tabbar"]; ok {
-			tabBarStyle = style
-		}
-		tabBarActiveStyle := tabBarStyle
-		if style, ok := config.Colorscheme["tabbar.active"]; ok {
-			tabBarActiveStyle = style
-		}
-		return tabBarStyle, tabBarActiveStyle
-	}
-	
-	draw := func(r rune, n int, active bool, reversed bool) {
-		tabBarStyle, tabBarActiveStyle := reverseStyles(reversed)
-		
-		style := tabBarStyle
-		if active {
-			style = tabBarActiveStyle
-		}
+	tabInactiveStyle := config.Colorscheme["tab.inactive"]
+	_, tabInactiveBg, _ := tabInactiveStyle.Decompose()
+
+	tabCornerStyle := tcell.Style{}.Foreground(tabBg).Background(tabBarBg)
+	tabCornerInactiveStyle := tcell.Style{}.Foreground(tabInactiveBg).Background(tabBarBg)
+
+	draw := func(r rune, n int, style tcell.Style) {
 		for i := 0; i < n; i++ {
 			rw := runewidth.RuneWidth(r)
 			for j := 0; j < rw; j++ {
@@ -142,34 +132,37 @@ func (w *TabWindow) Display() {
 	}
 
 	for i, n := range w.Names {
+		currentTabCornerStyle := tabCornerInactiveStyle
+		currentTabTextStyle := tabInactiveStyle
 		if i == w.active {
-			draw('[', 1, true, tabCharHighlight)
-		} else {
-			draw(' ', 1, false, tabCharHighlight)
+			currentTabCornerStyle = tabCornerStyle
+			currentTabTextStyle = tabStyle
 		}
-		
+
+		draw('◢', 1, currentTabCornerStyle)
+
+		for j := 0; j < tabNamePadding; j++ {
+			draw(' ', 1, currentTabTextStyle)
+		}
+
 		for _, c := range n {
-			draw(c, 1, i == w.active, tabCharHighlight)
+			draw(c, 1, currentTabTextStyle)
 		}
-		
+		draw(' ', 1, currentTabTextStyle)
+
 		if i == len(w.Names)-1 {
 			done = true
 		}
-		
-		if i == w.active {
-			draw(']', 1, true, tabCharHighlight)
-			draw(' ', 2, true, globalTabReverse)
-		} else {
-			draw(' ', 1, false, tabCharHighlight)
-			draw(' ', 2, false, globalTabReverse)
-		}
-		
+
+		draw('◣', 1, currentTabCornerStyle)
+		draw(' ', 2, tabBarStyle)
+
 		if x >= w.Width {
 			break
 		}
 	}
 
 	if x < w.Width {
-		draw(' ', w.Width-x, false, globalTabReverse)
+		draw(' ', w.Width-x, tabBarStyle)
 	}
 }

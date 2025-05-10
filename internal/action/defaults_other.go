@@ -94,6 +94,7 @@ var bufdefaults = map[string]string{
 	"F4":  "Quit",
 	"F7":  "Find",
 	"F10": "Quit",
+	"F12": "OpenMenu",
 	"Esc": "Escape,Deselect,ClearInfo,RemoveAllMultiCursors,UnhighlightSearch",
 
 	// Mouse bindings

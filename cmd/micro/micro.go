@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-errors/errors"
 	isatty "github.com/mattn/go-isatty"
+	"github.com/micro-editor/tcell/v2"
 	lua "github.com/yuin/gopher-lua"
 	"github.com/zyedidia/micro/v2/internal/action"
 	"github.com/zyedidia/micro/v2/internal/buffer"
@@ -26,7 +27,6 @@ import (
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/shell"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 var (
@@ -42,7 +42,8 @@ var (
 
 	sighup chan os.Signal
 
-	timerChan chan func()
+	timerChan  chan func()
+	actionChan chan string
 )
 
 func InitFlags() {
@@ -451,6 +452,10 @@ func main() {
 		// time out after 10ms
 	}
 
+	actionChan = make(chan string, 1)
+	action.TopMenuBar.SetActionChan(actionChan)
+	action.TopMenuBar.InitBindings()
+
 	for {
 		DoEvent()
 	}
@@ -469,6 +474,7 @@ func DoEvent() {
 	}
 	action.MainTab().Display()
 	action.InfoBar.Display()
+	action.TopMenuBar.Display()
 	screen.Screen.Show()
 
 	// Check for new events
@@ -491,6 +497,8 @@ func DoEvent() {
 		f()
 	case b := <-buffer.BackupCompleteChan:
 		b.RequestedBackup = false
+	case actionName := <-actionChan:
+		ExecAction(actionName)
 	case <-sighup:
 		exit(0)
 	case <-util.Sigterm:
@@ -512,10 +520,13 @@ func DoEvent() {
 		if resize {
 			action.InfoBar.HandleEvent(event)
 			action.Tabs.HandleEvent(event)
+		} else if action.TopMenuBar.IsOpen() {
+			action.TopMenuBar.HandleEvent(event)
 		} else if action.InfoBar.HasPrompt {
 			action.InfoBar.HandleEvent(event)
 		} else {
 			action.Tabs.HandleEvent(event)
+			action.TopMenuBar.HandleEvent(event)
 		}
 	}
 
@@ -523,4 +534,11 @@ func DoEvent() {
 	if err != nil {
 		screen.TermMessage(err)
 	}
+}
+
+func ExecAction(actionName string) {
+	if _, exits := action.InfoKeyActions[actionName]; exits && action.InfoBar.ExecAction(actionName) {
+		return
+	}
+	action.Tabs.ExecAction(actionName)
 }

@@ -3,12 +3,12 @@ package action
 import (
 	"bytes"
 
+	"github.com/micro-editor/tcell/v2"
 	"github.com/zyedidia/micro/v2/internal/buffer"
 	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/display"
 	"github.com/zyedidia/micro/v2/internal/info"
 	"github.com/zyedidia/micro/v2/internal/util"
-	"github.com/micro-editor/tcell/v2"
 )
 
 type InfoKeyAction func(*InfoPane)
@@ -21,21 +21,21 @@ func init() {
 	InfoBufBindings = NewKeyTree()
 }
 
-func InfoMapEvent(k Event, action string) {
-	config.Bindings["command"][k.Name()] = action
+func InfoMapEvent(k Event, actionName string) {
+	config.Bindings["command"][k.Name()] = actionName
 
 	switch e := k.(type) {
 	case KeyEvent, KeySequenceEvent, RawEvent:
-		infoMapKey(e, action)
+		infoMapKey(e, actionName)
 	case MouseEvent:
-		infoMapMouse(e, action)
+		infoMapMouse(e, actionName)
 	}
 }
 
-func infoMapKey(k Event, action string) {
-	if f, ok := InfoKeyActions[action]; ok {
+func infoMapKey(k Event, actionName string) {
+	if f, ok := InfoKeyActions[actionName]; ok {
 		InfoBindings.RegisterKeyBinding(k, InfoKeyActionGeneral(f))
-	} else if f, ok := BufKeyActions[action]; ok {
+	} else if f, ok := BufKeyActions[actionName]; ok {
 		InfoBufBindings.RegisterKeyBinding(k, BufKeyActionGeneral(f))
 	}
 }

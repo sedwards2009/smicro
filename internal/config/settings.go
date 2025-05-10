@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zyedidia/glob"
 	"github.com/micro-editor/json5"
+	"github.com/zyedidia/glob"
 	"github.com/zyedidia/micro/v2/internal/util"
 	"golang.org/x/text/encoding/htmlindex"
 )
@@ -93,7 +93,7 @@ var defaultCommonSettings = map[string]interface{}{
 	"splitbottom":     true,
 	"splitright":      true,
 	"statusformatl":   "$(filename) $(modified)$(overwrite)($(line),$(col)) $(status.paste)| ft:$(opt:filetype) | $(opt:fileformat) | $(opt:encoding)",
-	"statusformatr":   "$(bind:ToggleKeyMenu): bindings, $(bind:ToggleHelp): help",
+	"statusformatr":   "$(bind:ToggleKeyMenu): bindings, $(bind:OpenMenu): Menu",
 	"statusline":      true,
 	"syntax":          true,
 	"tabmovement":     false,

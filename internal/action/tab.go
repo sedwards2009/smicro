@@ -3,14 +3,16 @@ package action
 import (
 	luar "layeh.com/gopher-luar"
 
+	"github.com/micro-editor/tcell/v2"
 	"github.com/zyedidia/micro/v2/internal/buffer"
 	"github.com/zyedidia/micro/v2/internal/config"
 	"github.com/zyedidia/micro/v2/internal/display"
 	ulua "github.com/zyedidia/micro/v2/internal/lua"
 	"github.com/zyedidia/micro/v2/internal/screen"
 	"github.com/zyedidia/micro/v2/internal/views"
-	"github.com/micro-editor/tcell/v2"
 )
+
+const tabDisplayYOffset = 1
 
 // The TabList is a list of tabs and a window to display the tab bar
 // at the top of the screen
@@ -26,14 +28,14 @@ func NewTabList(bufs []*buffer.Buffer) *TabList {
 	iOffset := config.GetInfoBarOffset()
 	tl := new(TabList)
 	tl.List = make([]*Tab, len(bufs))
-	if len(bufs) > 1 {
+	if showTabBarForTabs(tl.List) {
 		for i, b := range bufs {
 			tl.List[i] = NewTabFromBuffer(0, 1, w, h-1-iOffset, b)
 		}
 	} else {
 		tl.List[0] = NewTabFromBuffer(0, 0, w, h-iOffset, bufs[0])
 	}
-	tl.TabWindow = display.NewTabWindow(w, 0)
+	tl.TabWindow = display.NewTabWindow(w, 1)
 	tl.Names = make([]string, len(bufs))
 
 	return tl
@@ -75,6 +77,15 @@ func (t *TabList) RemoveTab(id uint64) {
 	}
 }
 
+func showTabBarForTabs(list []*Tab) bool {
+	return true //len(t.List) > 1
+
+}
+
+func (t *TabList) showTabBar() bool {
+	return showTabBarForTabs(t.List)
+}
+
 // Resize resizes all elements within the tab list
 // One thing to note is that when there is only 1 tab
 // the tab bar should not be drawn so resizing must take
@@ -83,15 +94,15 @@ func (t *TabList) Resize() {
 	w, h := screen.Screen.Size()
 	iOffset := config.GetInfoBarOffset()
 	InfoBar.Resize(w, h-1)
-	if len(t.List) > 1 {
+	if t.showTabBar() {
 		for _, p := range t.List {
-			p.Y = 1
-			p.Node.Resize(w, h-1-iOffset)
+			p.Y = tabDisplayYOffset + 1
+			p.Node.Resize(w, h-1-iOffset-1)
 			p.Resize()
 		}
-	} else if len(t.List) == 1 {
-		t.List[0].Y = 0
-		t.List[0].Node.Resize(w, h-iOffset)
+	} else if !t.showTabBar() {
+		t.List[0].Y = tabDisplayYOffset
+		t.List[0].Node.Resize(w, h-iOffset-1)
 		t.List[0].Resize()
 	}
 	t.TabWindow.Resize(w, h)
@@ -107,7 +118,7 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 		mx, my := e.Position()
 		switch e.Buttons() {
 		case tcell.Button1:
-			if my == t.Y && len(t.List) > 1 {
+			if my == t.Y && t.showTabBar() {
 				if mx == 0 {
 					t.Scroll(-4)
 				} else if mx == t.Width-1 {
@@ -127,12 +138,12 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 				return
 			}
 		case tcell.WheelUp:
-			if my == t.Y && len(t.List) > 1 {
+			if my == t.Y && t.showTabBar() {
 				t.Scroll(4)
 				return
 			}
 		case tcell.WheelDown:
-			if my == t.Y && len(t.List) > 1 {
+			if my == t.Y && t.showTabBar() {
 				t.Scroll(-4)
 				return
 			}
@@ -141,10 +152,14 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 	t.List[t.Active()].HandleEvent(event)
 }
 
+func (t *TabList) ExecAction(actionName string) bool {
+	return t.List[t.Active()].ExecAction(actionName)
+}
+
 // Display updates the names and then displays the tab bar
 func (t *TabList) Display() {
 	t.UpdateNames()
-	if len(t.List) > 1 {
+	if t.showTabBar() {
 		t.TabWindow.Display()
 	}
 }
@@ -211,7 +226,7 @@ func InitTabs(bufs []*buffer.Buffer) {
 		for _, b := range bufs[1:] {
 			if multiopen == "vsplit" {
 				MainTab().CurPane().VSplitBuf(b)
-			} else {  // default hsplit
+			} else { // default hsplit
 				MainTab().CurPane().HSplitBuf(b)
 			}
 		}
@@ -277,6 +292,9 @@ func (t *Tab) HandleEvent(event tcell.Event) {
 	switch e := event.(type) {
 	case *tcell.EventMouse:
 		mx, my := e.Position()
+		if my < t.Node.Y {
+			return
+		}
 		btn := e.Buttons()
 		switch {
 		case btn & ^(tcell.WheelUp|tcell.WheelDown|tcell.WheelLeft|tcell.WheelRight) != tcell.ButtonNone:
@@ -335,6 +353,10 @@ func (t *Tab) HandleEvent(event tcell.Event) {
 
 	}
 	t.Panes[t.active].HandleEvent(event)
+}
+
+func (t *Tab) ExecAction(actionName string) bool {
+	return t.Panes[t.active].ExecAction(actionName)
 }
 
 // SetActive changes the currently active pane to the specified index
